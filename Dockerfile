@@ -9,6 +9,13 @@ COPY . /app
 # 3. Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Crear un usuario y grupo sin privilegios
+RUN adduser --disabled-password --gecos '' myuser
+
+# Cambiar al nuevo usuario
+USER myuser
+
+
 # 4. Run Celery directly
 CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info", "--concurrency=2", "--pool=solo"]
 
