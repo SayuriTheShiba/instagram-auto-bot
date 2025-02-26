@@ -21,7 +21,7 @@ MONGO_URI = os.getenv("MONGO_URL")
 REDIS_URL = os.getenv("REDIS_URL")
 
 # Configurar base de datos
-client = MongoClient(MONGO_URI)
+client = MongoClient(MONGO_URL)
 db = client["instagram_bot"]
 posts_collection = db["posts"]
 
