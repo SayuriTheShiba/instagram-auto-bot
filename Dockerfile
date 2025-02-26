@@ -10,7 +10,8 @@ COPY . /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 4. Run Celery directly
-CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info"]
+CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info", "--concurrency=2", "--pool=solo"]
+
 
 
 
