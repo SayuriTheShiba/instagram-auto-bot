@@ -13,3 +13,5 @@ CMD ["sh", "-c", "while true; do celery -A bot_instagram worker --loglevel=info;
 
 
 
+
+
