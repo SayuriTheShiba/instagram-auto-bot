@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    restart: always
+    depends_on:
+      - redis
+    environment:
+      INSTAGRAM_USER: "${INSTAGRAM_USER}"
+      INSTAGRAM_PASS: "${INSTAGRAM_PASS}"
+      MONGO_URI: "${MONGO_URI}"
+      REDIS_URL: "redis://default:mxJuHzwaYKiFEwIAzRfcjghRDurcethK@redis.railway.internal:6379"
+
+  redis:
+    image: "redis:alpine"
+    restart: always
