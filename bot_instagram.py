@@ -21,7 +21,7 @@ MONGO_URI = os.getenv("MONGO_URL")   # Asumimos que en Railway la variable se ll
 REDIS_URL = os.getenv("REDIS_URL")
 
 # Configurar base de datos
-client = MongoClient(MONGO_URI)      # Usar la misma variable MONGO_URI
+client = MongoClient(MONGO_URI)
 db = client["instagram_bot"]
 posts_collection = db["posts"]
 
@@ -36,14 +36,26 @@ def get_free_proxies():
     proxies = []
     for row in soup.select("table tbody tr"):
         columns = row.find_all("td")
-        ip, port, https = columns[0].text, columns[1].text, columns[6].text.strip()
-        if https == "yes":
+        # Validar que haya al menos 7 columnas antes de acceder a ellas
+        if len(columns) < 7:
+            continue
+        ip = columns[0].text.strip()
+        port = columns[1].text.strip()
+        https = columns[6].text.strip()
+        if https.lower() == "yes":
             proxies.append(f"http://{ip}:{port}")
+
+    # Opcional: manejar el caso de que no haya proxies
+    if not proxies:
+        print("⚠️ No se encontraron proxies HTTPS en la fuente principal.")
     return proxies
 
 proxies = get_free_proxies()
 
 def get_random_proxy():
+    if not proxies:
+        print("⚠️ No hay proxies disponibles, se usará conexión directa.")
+        return None
     proxy = random.choice(proxies)
     return {"http": proxy, "https": proxy}
 
@@ -54,8 +66,9 @@ def configure_selenium():
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 
     random_proxy = get_random_proxy()
-    proxy_http = random_proxy["http"]
-    options.add_argument(f"--proxy-server={proxy_http}")
+    if random_proxy:
+        proxy_http = random_proxy["http"]
+        options.add_argument(f"--proxy-server={proxy_http}")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
