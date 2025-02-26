@@ -23,6 +23,6 @@ services:
       INSTAGRAM_PASS: "${INSTAGRAM_PASS}"
       MONGO_URI: "mongodb.railway.internal"
       REDIS_URL: "redis://default:ltFAcydADlvycKkCMxqYypbeEEyQNZjN@redis.railway.internal:6379"  # <--- Cambiado para asegurar conexión local a Redis
-    command: sh -c "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --without-heartbeat & while true; do sleep 30; done"
+    command: sh -c "while true; do celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo; sleep 10; done"
     user: "myuser"
 
