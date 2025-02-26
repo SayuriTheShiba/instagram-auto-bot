@@ -82,7 +82,8 @@ ENV CHROMEDRIVER_BIN=/usr/local/bin/chromedriver
 ENV DISPLAY=:99
 
 # Ejecutar Celery en segundo plano y levantar un servidor HTTP dummy en primer plano
-CMD ["sh", "-c", "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --without-heartbeat & python -m http.server ${PORT:-8080}"]
+CMD ["supervisord", "-c", "/ruta/a/supervisord.conf"]
+
 
 
 
