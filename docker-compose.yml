@@ -21,7 +21,7 @@ services:
     environment:
       INSTAGRAM_USER: "${INSTAGRAM_USER}"
       INSTAGRAM_PASS: "${INSTAGRAM_PASS}"
-      MONGO_URI: "instagram-auto-bot.railway.internal"
+      RAILWAY_PRIVATE_DOMAIN: "instagram-auto-bot.railway.internal"
       REDIS_URL: "redis://default:ltFAcydADlvycKkCMxqYypbeEEyQNZjN@redis.railway.internal:6379"
     command: >
       sh -c "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo & 
