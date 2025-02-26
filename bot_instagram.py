@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 from celery import Celery
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.DEBUG,  # Cambiado a DEBUG
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
