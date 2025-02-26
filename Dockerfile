@@ -4,7 +4,7 @@ FROM python:3.12-slim
 # Establecer el directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias para Chrome y Selenium
+# Instalar dependencias del sistema necesarias para Chrome, Selenium y compilación de paquetes de Python
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
@@ -18,6 +18,10 @@ RUN apt-get update && apt-get install -y \
     libnspr4 \
     libnss3 \
     xdg-utils \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    python3-dev \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
@@ -31,9 +35,9 @@ RUN apt-get update && apt-get install -y google-chrome-stable --no-install-recom
     rm -rf /var/lib/apt/lists/*
 
 # Obtener la versión de Google Chrome instalada y descargar el ChromeDriver correcto
-RUN export CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
-    export CHROME_MAJOR_VERSION=$(echo "$CHROME_VERSION" | cut -d '.' -f1) && \
-    export CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
+    CHROME_MAJOR_VERSION=$(echo "$CHROME_VERSION" | cut -d '.' -f1) && \
+    CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
     echo "🔹 Versión de Google Chrome instalada: $CHROME_VERSION" && \
     echo "🔹 Intentando descargar ChromeDriver desde: $CHROMEDRIVER_URL" && \
     if wget --spider "$CHROMEDRIVER_URL" 2>/dev/null; then \
@@ -43,14 +47,17 @@ RUN export CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
         chmod +x /usr/local/bin/chromedriver-linux64 && \
         mv /usr/local/bin/chromedriver-linux64 /usr/local/bin/chromedriver; \
     else \
-        echo "⚠️ No se encontró ChromeDriver para la versión $CHROME_VERSION. Probando con la API antigua..." && \
-        export CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION") && \
-        export CHROMEDRIVER_URL_OLD="https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" && \
+        echo "⚠️ ChromeDriver para la versión $CHROME_VERSION no encontrado. Probando con la API antigua..." && \
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION") && \
+        CHROMEDRIVER_URL_OLD="https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" && \
         wget -q "$CHROMEDRIVER_URL_OLD" -O /tmp/chromedriver.zip && \
         unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
         rm /tmp/chromedriver.zip && \
         chmod +x /usr/local/bin/chromedriver; \
     fi
+
+# Actualizar pip, setuptools y wheel antes de instalar las dependencias de Python
+RUN pip install --upgrade pip setuptools wheel
 
 # Instalar dependencias de Python
 COPY requirements.txt .
@@ -59,7 +66,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Crear un usuario sin privilegios para ejecutar la aplicación
 RUN adduser --disabled-password --gecos '' myuser
 
-# Cambiar al nuevo usuario
+# Cambiar al usuario sin privilegios
 USER myuser
 
 # Copiar el resto de la aplicación
@@ -72,6 +79,7 @@ ENV DISPLAY=:99
 
 # Ejecutar Celery y evitar que el contenedor se cierre en Railway
 CMD ["sh", "-c", "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --without-heartbeat & while true; do sleep 30; done"]
+
 
 
 
