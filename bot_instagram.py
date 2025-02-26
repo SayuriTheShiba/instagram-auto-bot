@@ -18,9 +18,8 @@ from pymongo import MongoClient
 from bs4 import BeautifulSoup
 from celery import Celery
 
-# 🔹 Configurar logging para Railway
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
