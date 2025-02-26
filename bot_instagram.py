@@ -17,7 +17,7 @@ import os
 # Cargar variables de entorno
 INSTAGRAM_USER = os.getenv("INSTAGRAM_USER")
 INSTAGRAM_PASS = os.getenv("INSTAGRAM_PASS")
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("MONGO_URL")
 REDIS_URL = os.getenv("REDIS_URL")
 
 # Configurar base de datos
@@ -27,7 +27,6 @@ posts_collection = db["posts"]
 
 # Configurar Celery para tareas automáticas
 app = Celery("tasks", broker=REDIS_URL)
-app.conf.broker_connection_retry_on_startup = True  # Solución para Celery 6.0
 
 # Obtener proxies gratuitos
 def get_free_proxies():
@@ -38,35 +37,14 @@ def get_free_proxies():
     proxies = []
     for row in soup.select("table tbody tr"):
         columns = row.find_all("td")
-        if len(columns) >= 7:
-            ip, port, https = columns[0].text.strip(), columns[1].text.strip(), columns[6].text.strip()
-            if https.lower() == "yes":
-                proxies.append(f"http://{ip}:{port}")
-
+        ip, port, https = columns[0].text, columns[1].text, columns[6].text.strip()
+        if https == "yes":
+            proxies.append(f"http://{ip}:{port}")
     return proxies
 
-# Fuente alternativa de proxies
-def get_backup_proxies():
-    url = "https://proxylist.geonode.com/api/proxy-list?limit=20&page=1&sort_by=lastChecked&sort_type=desc"
-    response = requests.get(url).json()
-
-    proxy_list = []
-    for proxy in response["data"]:
-        if proxy["protocols"][0] == "https":
-            proxy_list.append(f"http://{proxy['ip']}:{proxy['port']}")
-
-    return proxy_list
-
-# Obtener proxies seguros
 proxies = get_free_proxies()
-if not proxies:
-    print("⚠️ No se encontraron proxies en la primera fuente. Probando otra fuente...")
-    proxies = get_backup_proxies()
 
 def get_random_proxy():
-    if not proxies:
-        print("⚠️ No hay proxies disponibles, ejecutando sin proxy.")
-        return None
     proxy = random.choice(proxies)
     return {"http": proxy, "https": proxy}
 
@@ -77,9 +55,9 @@ def configure_selenium():
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 
-    proxy = get_random_proxy()
-    if proxy:
-        options.add_argument(f"--proxy-server={proxy['http']}")
+    random_proxy = get_random_proxy()
+    proxy_http = random_proxy["http"]
+    options.add_argument(f"--proxy-server={proxy_http}")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
@@ -94,10 +72,20 @@ def login_instagram():
         driver.find_element(By.NAME, "username").send_keys(INSTAGRAM_USER)
         driver.find_element(By.NAME, "password").send_keys(INSTAGRAM_PASS)
         driver.find_element(By.NAME, "password").send_keys(Keys.RETURN)
+
         time.sleep(random.uniform(5, 10))
+
+        # Verificar si Instagram pide verificación (checkpoint/challenge)
+        current_url = driver.current_url
+        if "challenge" in current_url or "checkpoint" in current_url:
+            print("⚠️ Instagram está pidiendo verificación (challenge/checkpoint). Revisa la cuenta manualmente.")
+            return None
+        
+        print("✅ Inicio de sesión exitoso en Instagram.")
     except Exception as e:
-        print(f"❌ Error al iniciar sesión: {e}")
+        print(f"❌ Error al iniciar sesión en Instagram: {e}")
         driver.quit()
+        return None
 
     return driver
 
@@ -107,6 +95,7 @@ def get_posts_by_hashtag(driver, hashtag):
     time.sleep(random.uniform(5, 10))
 
     posts = driver.find_elements(By.CSS_SELECTOR, "article div div div div a")
+    # Extrae solo 5 para evitar bloqueos o exceso de scraping
     links = [post.get_attribute("href") for post in posts[:5]]
     return links
 
@@ -115,54 +104,54 @@ def download_image(driver, post_url):
     driver.get(post_url)
     time.sleep(random.uniform(5, 10))
 
-    try:
-        image_element = driver.find_element(By.CSS_SELECTOR, "article img")
-        image_url = image_element.get_attribute("src")
-        response = requests.get(image_url)
-        img = Image.open(BytesIO(response.content))
-        img.save("post.jpg")
+    image_element = driver.find_element(By.CSS_SELECTOR, "article img")
+    image_url = image_element.get_attribute("src")
 
-        author_element = driver.find_element(By.CSS_SELECTOR, "header div div div span a")
-        author = author_element.text
-        return author
-    except Exception as e:
-        print(f"❌ Error descargando imagen: {e}")
-        return None
+    response = requests.get(image_url)
+    img = Image.open(BytesIO(response.content))
+    img.save("post.jpg")
+
+    author_element = driver.find_element(By.CSS_SELECTOR, "header div div div span a")
+    author = author_element.text
+
+    return author
 
 # Publicar en Instagram
 def post_image(driver, image_path, caption):
     driver.get("https://www.instagram.com/")
     time.sleep(random.uniform(5, 10))
 
-    try:
-        driver.find_element(By.XPATH, "//div[text()='Create']").click()
-        time.sleep(random.uniform(3, 7))
+    driver.find_element(By.XPATH, "//div[text()='Create']").click()
+    time.sleep(random.uniform(3, 7))
 
-        file_input = driver.find_element(By.XPATH, "//input[@type='file']")
-        file_input.send_keys(image_path)
-        time.sleep(random.uniform(3, 7))
+    file_input = driver.find_element(By.XPATH, "//input[@type='file']")
+    file_input.send_keys(image_path)
+    time.sleep(random.uniform(3, 7))
 
-        driver.find_element(By.XPATH, "//button[text()='Next']").click()
-        time.sleep(random.uniform(3, 7))
+    driver.find_element(By.XPATH, "//button[text()='Next']").click()
+    time.sleep(random.uniform(3, 7))
 
-        caption_box = driver.find_element(By.XPATH, "//textarea")
-        caption_box.send_keys(caption)
+    caption_box = driver.find_element(By.XPATH, "//textarea")
+    caption_box.send_keys(caption)
 
-        driver.find_element(By.XPATH, "//button[text()='Share']").click()
-        time.sleep(random.uniform(5, 10))
-    except Exception as e:
-        print(f"❌ Error publicando en Instagram: {e}")
+    driver.find_element(By.XPATH, "//button[text()='Share']").click()
+    time.sleep(random.uniform(5, 10))
 
 # Automatización total
 @app.task
 def automate_instagram():
     driver = login_instagram()
+    # Si no logra iniciar sesión (driver == None), terminar la tarea
+    if driver is None:
+        print("⚠️ No se pudo iniciar sesión. Tarea terminada.")
+        return
+
     hashtags = [
         "sofubi", "arttoy", "designerart", "sofubipromoter", "softvinyl", 
         "sofubiforsale", "sofubilottery", "kaijuart", "handmadearttoy", 
         "arttoycollector", "resinart", "japanesetoys", "vinylart", "urbanvinyl", 
         "lowbrowart", "creativetoys", "hiddengemtoy", "collectibles"
-    ]  # Lista ampliada de hashtags
+    ]
 
     seo_captions = [
         "🔥 Descubre esta joya del #Sofubi 🎨 Perfecto para coleccionistas exigentes. ¿Qué te parece? 🚀\n#ArtToy #DesignerToys #KaijuArt",
@@ -175,18 +164,20 @@ def automate_instagram():
         "🔮 Magia en soft vinyl ✨ Una creación única de @{author} que redefine el #DesignerToys\n🔥 #HandmadeArtToy #HiddenGemToy",
         "🚀 Nuevo hallazgo en la escena del #Sofubi 🔥 ¿Quién más ama estos detalles? 👀\n🎨 By @{author}, una joya del #VinylArt",
         "💀 El #LowbrowArt en su máxima expresión 🎭\n🎨 Obra maestra de @{author} para coleccionistas con ojo crítico 👁️🔥\n#CollectibleVinyl",
-    ]  # Lista de captions SEO aleatorios para mayor diversidad
+    ]
 
+    # Iterar por cada hashtag
     for hashtag in hashtags:
         posts = get_posts_by_hashtag(driver, hashtag)
         for post in posts:
             author = download_image(driver, post)
-            if not author:
-                continue  # Evita errores si no pudo descargar la imagen
+            # Reemplazar @{author} en un caption al azar
+            final_caption = random.choice(seo_captions).replace("@{author}", f"@{author}")
+            post_image(driver, "post.jpg", final_caption)
 
-            seo_caption = random.choice(seo_captions).replace("@{author}", f"@{author}")
-            post_image(driver, "post.jpg", seo_caption)
-
+            # Esperar entre 30 y 60 minutos
             time.sleep(random.uniform(1800, 3600))
 
-automate_instagram.apply_async(countdown=3600)  # Ejecutar cada hora
+# Ejecutar la tarea cada hora
+automate_instagram.apply_async(countdown=3600)
+
