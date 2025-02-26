@@ -28,7 +28,7 @@ logging.basicConfig(
 # Cargar variables de entorno
 INSTAGRAM_USER = os.getenv("INSTAGRAM_USER")
 INSTAGRAM_PASS = os.getenv("INSTAGRAM_PASS")
-MONGO_URI = os.getenv("MONGO_URL")
+MONGO_URI = os.getenv("RAILWAY_PRIVATE_DOMAIN")
 REDIS_URL = os.getenv("REDIS_URL")
 
 # Configurar base de datos
