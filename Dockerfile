@@ -30,15 +30,27 @@ RUN mkdir -p /etc/apt/keyrings && \
 RUN apt-get update && apt-get install -y google-chrome-stable --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Obtener la versión completa de Google Chrome instalada y descargar ChromeDriver compatible
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
-    CHROME_MAJOR_VERSION=$(echo "$CHROME_VERSION" | cut -d '.' -f1) && \
-    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION") && \
-    echo "Descargando ChromeDriver versión: $CHROMEDRIVER_VERSION" && \
-    wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" -O /tmp/chromedriver.zip && \
-    unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
-    rm /tmp/chromedriver.zip && \
-    chmod +x /usr/local/bin/chromedriver
+# Obtener la versión de Google Chrome instalada y descargar el ChromeDriver correcto
+RUN export CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
+    export CHROME_MAJOR_VERSION=$(echo "$CHROME_VERSION" | cut -d '.' -f1) && \
+    export CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
+    echo "🔹 Versión de Google Chrome instalada: $CHROME_VERSION" && \
+    echo "🔹 Intentando descargar ChromeDriver desde: $CHROMEDRIVER_URL" && \
+    if wget --spider "$CHROMEDRIVER_URL" 2>/dev/null; then \
+        wget -q "$CHROMEDRIVER_URL" -O /tmp/chromedriver.zip && \
+        unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
+        rm /tmp/chromedriver.zip && \
+        chmod +x /usr/local/bin/chromedriver-linux64 && \
+        mv /usr/local/bin/chromedriver-linux64 /usr/local/bin/chromedriver; \
+    else \
+        echo "⚠️ No se encontró ChromeDriver para la versión $CHROME_VERSION. Probando con la API antigua..." && \
+        export CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION") && \
+        export CHROMEDRIVER_URL_OLD="https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" && \
+        wget -q "$CHROMEDRIVER_URL_OLD" -O /tmp/chromedriver.zip && \
+        unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
+        rm /tmp/chromedriver.zip && \
+        chmod +x /usr/local/bin/chromedriver; \
+    fi
 
 # Instalar dependencias de Python
 COPY requirements.txt .
