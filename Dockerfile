@@ -81,8 +81,8 @@ ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_BIN=/usr/local/bin/chromedriver
 ENV DISPLAY=:99
 
-# Ejecutar Celery y evitar que el contenedor se cierre en Railway
-CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info", "--concurrency=2", "--pool=solo", "--without-heartbeat"]
+# Ejecutar Celery en segundo plano y levantar un servidor HTTP dummy en primer plano
+CMD ["sh", "-c", "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --without-heartbeat & python -m http.server ${PORT:-8080}"]
 
 
 
