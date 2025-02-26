@@ -44,12 +44,6 @@ RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Crear un usuario sin privilegios
-RUN adduser --disabled-password --gecos '' myuser
-
-# Cambiar al nuevo usuario
-USER myuser
-
 # Copiar el resto de la aplicación
 COPY . .
 
