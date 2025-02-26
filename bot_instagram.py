@@ -1,6 +1,7 @@
 import time
 import random
 import requests
+import logging
 from io import BytesIO
 from PIL import Image
 from selenium import webdriver
@@ -13,6 +14,9 @@ from pymongo import MongoClient
 from bs4 import BeautifulSoup
 from celery import Celery
 import os
+
+# 🔹 Configurar logging para Railway
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Cargar variables de entorno
 INSTAGRAM_USER = os.getenv("INSTAGRAM_USER")
@@ -28,9 +32,9 @@ posts_collection = db["posts"]
 # Configurar Celery
 app = Celery("bot_instagram", broker=REDIS_URL)
 app.conf.broker_connection_retry_on_startup = True
-app.conf.task_acks_late = True  # Evita perder tareas si el worker muere
-app.conf.task_acks_on_failure_or_timeout = False  # No marca la tarea como ACK si falla
-app.conf.worker_prefetch_multiplier = 1  # Asegura que Celery solo ejecute una tarea a la vez
+app.conf.task_acks_late = True
+app.conf.task_acks_on_failure_or_timeout = False
+app.conf.worker_prefetch_multiplier = 1
 
 # Obtener proxies gratuitos
 def get_free_proxies():
@@ -48,15 +52,19 @@ def get_free_proxies():
             if https.lower() == "yes":
                 proxies.append(f"http://{ip}:{port}")
 
-        return proxies if proxies else []
+        if not proxies:
+            logging.warning("⚠️ No se encontraron proxies HTTPS.")
+        return proxies
     except Exception as e:
-        print(f"❌ Error al obtener proxies: {e}")
+        logging.error(f"❌ Error al obtener proxies: {e}")
         return []
 
 proxies = get_free_proxies()
 
 def get_random_proxy():
-    return {"http": random.choice(proxies), "https": random.choice(proxies)} if proxies else None
+    if proxies:
+        return {"http": random.choice(proxies), "https": random.choice(proxies)}
+    return None
 
 # Configurar Selenium WebDriver
 def configure_selenium():
@@ -70,19 +78,20 @@ def configure_selenium():
         options.add_argument(f"--proxy-server={proxy['http']}")
 
     try:
+        logging.info("🔄 Iniciando WebDriver para Selenium...")
         return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     except Exception as e:
-        print(f"❌ Error configurando Selenium: {e}")
+        logging.error(f"❌ Error configurando Selenium: {e}")
         return None
 
 # Iniciar sesión en Instagram
 def login_instagram():
     driver = configure_selenium()
     if not driver:
-        print("❌ WebDriver no inició correctamente.")
+        logging.error("❌ WebDriver no inició correctamente.")
         return None
 
-    print("🔄 Iniciando sesión en Instagram...")
+    logging.info("🔄 Iniciando sesión en Instagram...")
     driver.get("https://www.instagram.com/accounts/login/")
     time.sleep(random.uniform(3, 7))
 
@@ -93,13 +102,13 @@ def login_instagram():
         time.sleep(random.uniform(5, 10))
 
         if "challenge" in driver.current_url or "checkpoint" in driver.current_url:
-            print("⚠️ Instagram requiere verificación manual.")
+            logging.warning("⚠️ Instagram requiere verificación manual.")
             driver.quit()
             return None
 
-        print("✅ Inicio de sesión exitoso.")
+        logging.info("✅ Inicio de sesión exitoso en Instagram.")
     except Exception as e:
-        print(f"❌ Error al iniciar sesión: {e}")
+        logging.error(f"❌ Error al iniciar sesión: {e}")
         driver.quit()
         return None
 
@@ -108,17 +117,19 @@ def login_instagram():
 # Obtener publicaciones por hashtag
 def get_posts_by_hashtag(driver, hashtag):
     try:
+        logging.info(f"🔍 Buscando publicaciones para #{hashtag}")
         driver.get(f"https://www.instagram.com/explore/tags/{hashtag}/")
         time.sleep(random.uniform(5, 10))
         posts = driver.find_elements(By.CSS_SELECTOR, "article div div div div a")
         return [post.get_attribute("href") for post in posts[:5]]
     except Exception as e:
-        print(f"❌ Error al obtener posts de #{hashtag}: {e}")
+        logging.error(f"❌ Error al obtener posts de #{hashtag}: {e}")
         return []
 
 # Descargar imagen y obtener autor
 def download_image(driver, post_url):
     try:
+        logging.info(f"📥 Descargando imagen desde {post_url}")
         driver.get(post_url)
         time.sleep(random.uniform(5, 10))
         image_element = driver.find_element(By.CSS_SELECTOR, "article img")
@@ -131,12 +142,13 @@ def download_image(driver, post_url):
         author_element = driver.find_element(By.CSS_SELECTOR, "header div div div span a")
         return author_element.text
     except Exception as e:
-        print(f"❌ Error al descargar imagen: {e}")
+        logging.error(f"❌ Error al descargar imagen: {e}")
         return "Unknown"
 
 # Publicar en Instagram
 def post_image(driver, image_path, caption):
     try:
+        logging.info("🚀 Publicando en Instagram...")
         driver.get("https://www.instagram.com/")
         time.sleep(random.uniform(5, 10))
         driver.find_element(By.XPATH, "//div[text()='Create']").click()
@@ -155,25 +167,30 @@ def post_image(driver, image_path, caption):
         driver.find_element(By.XPATH, "//button[text()='Share']").click()
         time.sleep(random.uniform(5, 10))
 
-        print("✅ Publicación exitosa.")
+        logging.info("✅ Publicación exitosa.")
     except Exception as e:
-        print(f"❌ Error al publicar: {e}")
+        logging.error(f"❌ Error al publicar: {e}")
 
 # Automatización total
 @app.task
 def automate_instagram():
     driver = login_instagram()
     if driver is None:
-        print("⚠️ Tarea detenida: Error de inicio de sesión.")
+        logging.warning("⚠️ Tarea detenida: Error de inicio de sesión.")
         return
 
-    hashtags = [
-        "sofubi", "arttoy", "designerart", "softvinyl", "handmadearttoy"
-    ]
-
+    hashtags = ["sofubi", "arttoy", "designerart", "softvi", "sofubilottery", "collectibles", "sofubiforsale", "sofubipromoter"]
     seo_captions = [
-        "🔥 Descubre esta joya del #Sofubi 🎨 ¿Qué te parece? 🚀\n#ArtToy #KaijuArt",
-        "✨ Este #ArtToy es una obra maestra 🏆\n🎨 Creado por @{author}, un maestro del #Sofubi 👀",
+        "🔥 Descubre esta joya del #Sofubi 🎨 Perfecto para coleccionistas exigentes. ¿Qué te parece? 🚀\n#ArtToy #DesignerToys #KaijuArt",
+        "✨ Este #ArtToy es una obra maestra 🏆 Ideal para fans del #VinylArt y el #SoftVinyl 🎭\n🎨 Mención especial a @{author} por esta pieza increíble. #HandmadeArtToy",
+        "💎 Para los verdaderos coleccionistas: una pieza de ensueño 🤩🔥\n🎨 Creado por @{author}, un maestro del #Sofubi 👀 ¿Ya tienes el tuyo? #RareToy",
+        "🚀 Diseño exclusivo para amantes del #UrbanVinyl y el #ResinArt 💀\n🎨 Esta pieza de @{author} es un MUST HAVE para tu colección. #Collectibles",
+        "🔥 Edición limitada 🚨 No te quedes sin esta obra de arte en soft vinyl 🖤\n🛒 ¿La agregarías a tu colección? #KaijuArt #ToyPhotography",
+        "🎭 El arte en vinil cobra vida con esta impresionante creación 🎨\nCreado por @{author}, una leyenda del #ArtToy 👏🔥\n📢 #ToyCollector #JapaneseToys",
+        "🏆 Solo para coleccionistas serios 😎 Esta pieza de #Sofubi es una rareza absoluta 🛒\n🎨 Obra de @{author}, ¡apoya a los artistas! #VinylToys",
+        "🔮 Magia en soft vinyl ✨ Una creación única de @{author} que redefine el #DesignerToys\n🔥 #HandmadeArtToy #HiddenGemToy",
+        "🚀 Nuevo hallazgo en la escena del #Sofubi 🔥 ¿Quién más ama estos detalles? 👀\n🎨 By @{author}, una joya del #VinylArt",
+        "💀 El #LowbrowArt en su máxima expresión 🎭\n🎨 Obra maestra de @{author} para coleccionistas con ojo crítico 👁️🔥\n#CollectibleVinyl",
     ]
 
     for hashtag in hashtags:
@@ -184,10 +201,8 @@ def automate_instagram():
             post_image(driver, "post.jpg", caption)
             time.sleep(random.uniform(1800, 3600))
 
-    print("✅ Tarea completada. Siguiente ejecución en 1 hora.")
+    logging.info("✅ Tarea completada. Siguiente ejecución en 1 hora.")
     driver.quit()
 
-# Asegurar que la tarea solo se ejecute una vez por hora
 if __name__ == "__main__":
     automate_instagram.apply_async(countdown=3600)
-
