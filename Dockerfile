@@ -11,5 +11,6 @@ COPY . /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Comando para iniciar Celery como worker
-CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info"]
+CMD ["sh", "-c", "celery -A bot_instagram worker --loglevel=info --uid=nobody"]
+
 
