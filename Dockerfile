@@ -53,7 +53,8 @@ ENV CHROMEDRIVER_BIN=/usr/local/bin/chromedriver
 ENV DISPLAY=:99
 
 # Ejecutar Celery
-CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info", "--concurrency=2", "--pool=solo"]
+CMD ["sh", "-c", "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo & while true; do sleep 30; done"]
+
 
 
 
