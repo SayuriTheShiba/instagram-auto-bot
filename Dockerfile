@@ -30,34 +30,36 @@ RUN mkdir -p /etc/apt/keyrings && \
 RUN apt-get update && apt-get install -y google-chrome-stable --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Obtener la versión completa de Google Chrome instalada y descargar el ChromeDriver compatible
+# Obtener la versión completa de Google Chrome instalada y descargar ChromeDriver compatible
 RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
-    CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip" && \
-    echo "Descargando ChromeDriver desde: $CHROMEDRIVER_URL" && \
-    wget -q "$CHROMEDRIVER_URL" -O /tmp/chromedriver.zip && \
+    CHROME_MAJOR_VERSION=$(echo "$CHROME_VERSION" | cut -d '.' -f1) && \
+    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION") && \
+    echo "Descargando ChromeDriver versión: $CHROMEDRIVER_VERSION" && \
+    wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" -O /tmp/chromedriver.zip && \
     unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
     rm /tmp/chromedriver.zip && \
-    chmod +x /usr/local/bin/chromedriver-linux64 && \
-    mv /usr/local/bin/chromedriver-linux64 /usr/local/bin/chromedriver
+    chmod +x /usr/local/bin/chromedriver
 
 # Instalar dependencias de Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Crear un usuario sin privilegios para ejecutar la aplicación
+RUN adduser --disabled-password --gecos '' myuser
+
+# Cambiar al nuevo usuario
+USER myuser
+
 # Copiar el resto de la aplicación
 COPY . .
 
-# Definir variable de entorno para Chrome sin sandbox
+# Definir variables de entorno para Chrome y ChromeDriver
 ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_BIN=/usr/local/bin/chromedriver
 ENV DISPLAY=:99
 
-# Ejecutar Celery
-CMD ["sh", "-c", "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo & while true; do sleep 30; done"]
-
-
-
-
+# Ejecutar Celery y evitar que el contenedor se cierre en Railway
+CMD ["sh", "-c", "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --without-heartbeat & while true; do sleep 30; done"]
 
 
 
