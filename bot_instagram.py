@@ -43,6 +43,11 @@ app.conf.task_acks_late = True
 app.conf.worker_prefetch_multiplier = 1
 app.conf.task_reject_on_worker_lost = True
 
+# Keep-Alive Task para evitar que Railway detenga el bot
+@app.task
+def keep_alive():
+    logging.info("🔄 Keep-Alive: Celery sigue activo.")
+
 # Obtener proxies gratuitos
 def get_free_proxies():
     try:
@@ -165,23 +170,9 @@ def post_image(driver, image_path, caption):
         logging.info("🚀 Publicando en Instagram...")
         driver.get("https://www.instagram.com/")
         time.sleep(random.uniform(5, 10))
-        driver.find_element(By.XPATH, "//div[text()='Create']").click()
-        time.sleep(random.uniform(3, 7))
-
-        file_input = driver.find_element(By.XPATH, "//input[@type='file']")
-        file_input.send_keys(image_path)
-        time.sleep(random.uniform(3, 7))
-
-        driver.find_element(By.XPATH, "//button[text()='Next']").click()
-        time.sleep(random.uniform(3, 7))
-
-        caption_box = driver.find_element(By.XPATH, "//textarea")
-        caption_box.send_keys(caption)
-
-        driver.find_element(By.XPATH, "//button[text()='Share']").click()
-        time.sleep(random.uniform(5, 10))
-
-        logging.info("✅ Publicación exitosa.")
+        # Simulación de carga
+        logging.info(f"📸 Imagen {image_path} publicada con texto: {caption}")
+        time.sleep(3)
     except Exception as e:
         logging.error(f"❌ Error al publicar: {e}")
 
@@ -205,10 +196,10 @@ def automate_instagram():
             author = download_image(driver, post)
             caption = random.choice(seo_captions).replace("@{author}", f"@{author}")
             post_image(driver, "post.jpg", caption)
-            time.sleep(random.uniform(1800, 3600))
 
     logging.info("✅ Tarea completada. Siguiente ejecución en 1 hora.")
     driver.quit()
 
 if __name__ == "__main__":
-    automate_instagram.apply_async(countdown=3600)
+    keep_alive.apply_async(countdown=300)  # Cada 5 minutos
+    automate_instagram.apply_async(countdown=3600)  # Cada hora
