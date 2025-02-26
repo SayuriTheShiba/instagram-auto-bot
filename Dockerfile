@@ -75,7 +75,7 @@ COPY supervisord.conf /etc/supervisor/supervisord.conf
 # Copia todo el resto de la aplicación
 COPY . .
 
-# (Opcional) Crea un usuario sin privilegios
+# (Opcional) Crea un usuario sin privilegios y cambia a él
 RUN adduser --disabled-password --gecos '' myuser
 USER myuser
 
@@ -86,14 +86,3 @@ ENV DISPLAY=:99
 
 # Inicia Supervisor con la configuración (Celery + Servidor HTTP dummy)
 CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
-
-
-
-
-
-
-
-
-
-
-
