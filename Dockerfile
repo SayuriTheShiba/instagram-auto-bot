@@ -1,4 +1,4 @@
-# Usar la imagen base oficial de Python
+# Usar la imagen base de Python
 FROM python:3.12-slim
 
 # 1. Establecer el directorio de trabajo
@@ -11,32 +11,19 @@ COPY . /app
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
-    gnupg \
     curl \
-    libxss1 \
-    libappindicator1 \
-    libgconf-2-4 \
-    libnss3 \
-    libx11-xcb1 \
-    libxtst6 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libxcb-dri3-0 \
-    fonts-liberation \
-    libasound2 \
-    libnspr4 \
-    xdg-utils \
-    lsb-release \
+    gnupg \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
 # 4. Añadir la clave y el repositorio de Google Chrome
 RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
 
 # 5. Instalar Google Chrome
-RUN apt-get update && apt-get install -y google-chrome-stable --no-install-recommends && \
+RUN apt-get update && apt-get install -y \
+    google-chrome-stable \
+    --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
 # 6. Descargar e instalar ChromeDriver
@@ -56,11 +43,12 @@ RUN adduser --disabled-password --gecos '' myuser
 # 9. Cambiar al nuevo usuario
 USER myuser
 
-# 10. Establecer la variable de entorno para ejecutar Chrome en modo sin cabeza
+# 10. Establecer la variable de entorno para Chrome en modo sin cabeza
 ENV DISPLAY=:99
 
-# 11. Ejecutar Celery
+# 11. Comando para ejecutar Celery
 CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info", "--concurrency=2", "--pool=solo"]
+
 
 
 
