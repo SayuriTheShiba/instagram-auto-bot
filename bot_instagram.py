@@ -2,6 +2,7 @@ import time
 import random
 import requests
 import logging
+import sys
 from io import BytesIO
 from PIL import Image
 from selenium import webdriver
@@ -16,7 +17,11 @@ from celery import Celery
 import os
 
 # 🔹 Configurar logging para Railway
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 # Cargar variables de entorno
 INSTAGRAM_USER = os.getenv("INSTAGRAM_USER")
@@ -33,7 +38,6 @@ posts_collection = db["posts"]
 app = Celery("bot_instagram", broker=REDIS_URL)
 app.conf.broker_connection_retry_on_startup = True
 app.conf.task_acks_late = True
-app.conf.task_acks_on_failure_or_timeout = False
 app.conf.worker_prefetch_multiplier = 1
 
 # Obtener proxies gratuitos
@@ -179,18 +183,10 @@ def automate_instagram():
         logging.warning("⚠️ Tarea detenida: Error de inicio de sesión.")
         return
 
-    hashtags = ["sofubi", "arttoy", "designerart", "softvi", "sofubilottery", "collectibles", "sofubiforsale", "sofubipromoter"]
+    hashtags = ["sofubi", "arttoy", "designerart"]
     seo_captions = [
-        "🔥 Descubre esta joya del #Sofubi 🎨 Perfecto para coleccionistas exigentes. ¿Qué te parece? 🚀\n#ArtToy #DesignerToys #KaijuArt",
-        "✨ Este #ArtToy es una obra maestra 🏆 Ideal para fans del #VinylArt y el #SoftVinyl 🎭\n🎨 Mención especial a @{author} por esta pieza increíble. #HandmadeArtToy",
-        "💎 Para los verdaderos coleccionistas: una pieza de ensueño 🤩🔥\n🎨 Creado por @{author}, un maestro del #Sofubi 👀 ¿Ya tienes el tuyo? #RareToy",
-        "🚀 Diseño exclusivo para amantes del #UrbanVinyl y el #ResinArt 💀\n🎨 Esta pieza de @{author} es un MUST HAVE para tu colección. #Collectibles",
-        "🔥 Edición limitada 🚨 No te quedes sin esta obra de arte en soft vinyl 🖤\n🛒 ¿La agregarías a tu colección? #KaijuArt #ToyPhotography",
-        "🎭 El arte en vinil cobra vida con esta impresionante creación 🎨\nCreado por @{author}, una leyenda del #ArtToy 👏🔥\n📢 #ToyCollector #JapaneseToys",
-        "🏆 Solo para coleccionistas serios 😎 Esta pieza de #Sofubi es una rareza absoluta 🛒\n🎨 Obra de @{author}, ¡apoya a los artistas! #VinylToys",
-        "🔮 Magia en soft vinyl ✨ Una creación única de @{author} que redefine el #DesignerToys\n🔥 #HandmadeArtToy #HiddenGemToy",
-        "🚀 Nuevo hallazgo en la escena del #Sofubi 🔥 ¿Quién más ama estos detalles? 👀\n🎨 By @{author}, una joya del #VinylArt",
-        "💀 El #LowbrowArt en su máxima expresión 🎭\n🎨 Obra maestra de @{author} para coleccionistas con ojo crítico 👁️🔥\n#CollectibleVinyl",
+        "🔥 Descubre esta joya del #Sofubi 🎨 ¿Qué te parece? 🚀\n#ArtToy #KaijuArt",
+        "✨ Este #ArtToy es una obra maestra 🏆\n🎨 Creado por @{author}, un maestro del #Sofubi 👀",
     ]
 
     for hashtag in hashtags:
