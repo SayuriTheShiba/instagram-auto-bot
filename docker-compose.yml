@@ -21,8 +21,8 @@ services:
     environment:
       INSTAGRAM_USER: "${INSTAGRAM_USER}"
       INSTAGRAM_PASS: "${INSTAGRAM_PASS}"
-      MONGO_URI: "${MONGO_URI}"
-      REDIS_URL: "redis://default:ltFAcydADlvycKkCMxqYypbeEEyQNZjN@redis.railway.internal:6379"  # <--- Cambiado para asegurar conexión local a Redis
+      MONGO_URI: "${{MongoDB.MONGO_URL}}"
+      REDIS_URL: "${{Redis.REDIS_URL}}"  # <--- Cambiado para asegurar conexión local a Redis
     command: sh -c "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --uid=myuser"
     user: "myuser"
 
