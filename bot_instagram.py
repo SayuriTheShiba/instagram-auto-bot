@@ -14,21 +14,21 @@ from bs4 import BeautifulSoup
 from celery import Celery
 import os
 
-# Load environment variables
+# Cargar variables de entorno
 INSTAGRAM_USER = os.getenv("INSTAGRAM_USER")
 INSTAGRAM_PASS = os.getenv("INSTAGRAM_PASS")
 MONGO_URI = os.getenv("MONGO_URL")
 REDIS_URL = os.getenv("REDIS_URL")
 
-# Database Configuration
+# Configurar base de datos
 client = MongoClient(MONGO_URI)
 db = client["instagram_bot"]
 posts_collection = db["posts"]
 
-# Celery Configuration
+# Configurar Celery para tareas automáticas
 app = Celery("tasks", broker=REDIS_URL)
 
-# Function to Get Free Proxies
+# Obtener proxies gratuitos
 def get_free_proxies():
     try:
         url = "https://free-proxy-list.net/"
@@ -38,14 +38,14 @@ def get_free_proxies():
         proxies = []
         for row in soup.select("table tbody tr"):
             columns = row.find_all("td")
-            if len(columns) < 7:  # Ensure valid row
+            if len(columns) < 7:
                 continue
             ip, port, https = columns[0].text.strip(), columns[1].text.strip(), columns[6].text.strip()
             if https.lower() == "yes":
                 proxies.append(f"http://{ip}:{port}")
 
         if not proxies:
-            print("⚠️ No HTTPS proxies found.")
+            print("⚠️ No HTTPS proxies found. Using direct connection.")
         return proxies
     except Exception as e:
         print(f"❌ Error fetching proxies: {e}")
@@ -55,11 +55,10 @@ proxies = get_free_proxies()
 
 def get_random_proxy():
     if not proxies:
-        print("⚠️ No proxies available, using direct connection.")
         return None
     return {"http": random.choice(proxies), "https": random.choice(proxies)}
 
-# Configure Selenium WebDriver
+# Configurar Selenium WebDriver
 def configure_selenium():
     options = Options()
     options.add_argument("--headless")
@@ -74,15 +73,17 @@ def configure_selenium():
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         return driver
     except Exception as e:
-        print(f"❌ Error configuring Selenium: {e}")
+        print(f"❌ Error configurando Selenium: {e}")
         return None
 
-# Instagram Login
+# Iniciar sesión en Instagram
 def login_instagram():
     driver = configure_selenium()
     if not driver:
+        print("❌ Selenium WebDriver no pudo iniciarse.")
         return None
 
+    print("🔄 Iniciando sesión en Instagram...")
     driver.get("https://www.instagram.com/accounts/login/")
     time.sleep(random.uniform(3, 7))
 
@@ -95,34 +96,37 @@ def login_instagram():
 
         current_url = driver.current_url
         if "challenge" in current_url or "checkpoint" in current_url:
-            print("⚠️ Instagram requires verification. Manual action needed.")
+            print("⚠️ Instagram requiere verificación manual.")
             driver.quit()
             return None
 
-        print("✅ Successfully logged into Instagram.")
+        print("✅ Inicio de sesión exitoso.")
     except Exception as e:
-        print(f"❌ Login error: {e}")
+        print(f"❌ Error al iniciar sesión: {e}")
         driver.quit()
         return None
 
     return driver
 
-# Scrape Posts by Hashtag
+# Obtener publicaciones por hashtag
 def get_posts_by_hashtag(driver, hashtag):
     try:
+        print(f"🔍 Buscando publicaciones con #{hashtag}...")
         driver.get(f"https://www.instagram.com/explore/tags/{hashtag}/")
         time.sleep(random.uniform(5, 10))
 
         posts = driver.find_elements(By.CSS_SELECTOR, "article div div div div a")
         links = [post.get_attribute("href") for post in posts[:5]]
+        print(f"✅ Encontradas {len(links)} publicaciones para #{hashtag}.")
         return links
     except Exception as e:
-        print(f"❌ Error fetching posts for #{hashtag}: {e}")
+        print(f"❌ Error obteniendo posts de #{hashtag}: {e}")
         return []
 
-# Download Image and Extract Author
+# Descargar imagen y obtener autor
 def download_image(driver, post_url):
     try:
+        print(f"⬇️ Descargando imagen de {post_url}...")
         driver.get(post_url)
         time.sleep(random.uniform(5, 10))
 
@@ -134,14 +138,16 @@ def download_image(driver, post_url):
         img.save("post.jpg")
 
         author_element = driver.find_element(By.CSS_SELECTOR, "header div div div span a")
+        print(f"✅ Imagen descargada. Autor: {author_element.text}")
         return author_element.text
     except Exception as e:
-        print(f"❌ Error downloading image: {e}")
+        print(f"❌ Error descargando imagen: {e}")
         return "Unknown"
 
-# Post Image on Instagram
+# Publicar en Instagram
 def post_image(driver, image_path, caption):
     try:
+        print(f"📤 Publicando: {caption[:30]}...")
         driver.get("https://www.instagram.com/")
         time.sleep(random.uniform(5, 10))
 
@@ -161,20 +167,22 @@ def post_image(driver, image_path, caption):
         driver.find_element(By.XPATH, "//button[text()='Share']").click()
         time.sleep(random.uniform(5, 10))
 
-        print("✅ Successfully posted on Instagram.")
+        print("✅ Publicación exitosa.")
     except Exception as e:
-        print(f"❌ Error posting: {e}")
+        print(f"❌ Error al publicar: {e}")
 
-# Celery Task to Automate Instagram Posting
+# Automatización total
 @app.task
 def automate_instagram():
     driver = login_instagram()
     if driver is None:
-        print("⚠️ Task stopped: Instagram login failed.")
+        print("⚠️ Tarea detenida: Error de inicio de sesión.")
         return
 
-    hashtags = ["sofubi", "arttoy", "designerart", "sofubipromoter", "softvinyl"]
-    
+    hashtags = [
+        "sofubi", "arttoy", "designerart", "softvinyl", "handmadearttoy"
+    ]
+
     seo_captions = [
         "🔥 Descubre esta joya del #Sofubi 🎨 Perfecto para coleccionistas exigentes. ¿Qué te parece? 🚀\n#ArtToy #DesignerToys #KaijuArt",
         "✨ Este #ArtToy es una obra maestra 🏆 Ideal para fans del #VinylArt y el #SoftVinyl 🎭\n🎨 Mención especial a @{author} por esta pieza increíble. #HandmadeArtToy",
@@ -186,7 +194,7 @@ def automate_instagram():
         "🔮 Magia en soft vinyl ✨ Una creación única de @{author} que redefine el #DesignerToys\n🔥 #HandmadeArtToy #HiddenGemToy",
         "🚀 Nuevo hallazgo en la escena del #Sofubi 🔥 ¿Quién más ama estos detalles? 👀\n🎨 By @{author}, una joya del #VinylArt",
         "💀 El #LowbrowArt en su máxima expresión 🎭\n🎨 Obra maestra de @{author} para coleccionistas con ojo crítico 👁️🔥\n#CollectibleVinyl",
-    ]  # Lista de captions SEO aleatorios para mayor diversidad
+    ]
 
     for hashtag in hashtags:
         posts = get_posts_by_hashtag(driver, hashtag)
@@ -194,9 +202,10 @@ def automate_instagram():
             author = download_image(driver, post)
             caption = random.choice(seo_captions).replace("@{author}", f"@{author}")
             post_image(driver, "post.jpg", caption)
-
             time.sleep(random.uniform(1800, 3600))
 
-automate_instagram.apply_async(countdown=3600)
+    print("✅ Tarea completada. Siguiente ejecución en 1 hora.")
+    driver.quit()
 
+automate_instagram.apply_async(countdown=3600)
 
