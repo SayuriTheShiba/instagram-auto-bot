@@ -39,6 +39,7 @@ app = Celery("bot_instagram", broker=REDIS_URL)
 app.conf.broker_connection_retry_on_startup = True
 app.conf.task_acks_late = True
 app.conf.worker_prefetch_multiplier = 1
+task_reject_on_worker_lost = True
 
 # Obtener proxies gratuitos
 def get_free_proxies():
