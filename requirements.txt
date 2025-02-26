@@ -1,0 +1,9 @@
+selenium
+webdriver-manager
+pillow
+requests
+beautifulsoup4
+pymongo
+celery
+redis
+python-dotenv
