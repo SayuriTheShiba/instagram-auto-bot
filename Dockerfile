@@ -30,12 +30,8 @@ RUN mkdir -p /etc/apt/keyrings && \
 RUN apt-get update && apt-get install -y google-chrome-stable --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Obtener la versión de Google Chrome instalada
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
-    echo "Versión de Google Chrome instalada: $CHROME_VERSION"
-
-# Descargar e instalar la versión compatible de ChromeDriver
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
+# Obtener la versión de Google Chrome instalada y descargar el ChromeDriver compatible
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d '.' -f1,2) && \
     CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION") && \
     echo "Descargando ChromeDriver versión: $CHROMEDRIVER_VERSION" && \
     wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" -O /tmp/chromedriver.zip && \
@@ -55,6 +51,11 @@ USER myuser
 
 # Copiar el resto de la aplicación
 COPY . .
+
+# Definir variable de entorno para Chrome sin sandbox
+ENV CHROME_BIN=/usr/bin/google-chrome
+ENV CHROMEDRIVER_BIN=/usr/local/bin/chromedriver
+ENV DISPLAY=:99
 
 # Ejecutar Celery
 CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info", "--concurrency=2", "--pool=solo"]
