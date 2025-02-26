@@ -23,6 +23,6 @@ services:
       INSTAGRAM_PASS: "${INSTAGRAM_PASS}"
       MONGO_URI: "${{MongoDB.MONGO_URL}}"
       REDIS_URL: "${{Redis.REDIS_URL}}"  # <--- Cambiado para asegurar conexión local a Redis
-    command: sh -c "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --uid=myuser"
+    command: sh -c "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --without-heartbeat & while true; do sleep 30; done"
     user: "myuser"
 
