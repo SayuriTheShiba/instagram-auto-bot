@@ -10,6 +10,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from pymongo import MongoClient
 from bs4 import BeautifulSoup
@@ -39,7 +41,7 @@ app = Celery("bot_instagram", broker=REDIS_URL)
 app.conf.broker_connection_retry_on_startup = True
 app.conf.task_acks_late = True
 app.conf.worker_prefetch_multiplier = 1
-task_reject_on_worker_lost = True
+app.conf.task_reject_on_worker_lost = True
 
 # Obtener proxies gratuitos
 def get_free_proxies():
@@ -48,14 +50,10 @@ def get_free_proxies():
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
 
-        proxies = []
-        for row in soup.select("table tbody tr"):
-            columns = row.find_all("td")
-            if len(columns) < 7:
-                continue
-            ip, port, https = columns[0].text.strip(), columns[1].text.strip(), columns[6].text.strip()
-            if https.lower() == "yes":
-                proxies.append(f"http://{ip}:{port}")
+        proxies = [
+            f"http://{row.find_all('td')[0].text.strip()}:{row.find_all('td')[1].text.strip()}"
+            for row in soup.select("table tbody tr") if len(row.find_all("td")) >= 7 and row.find_all("td")[6].text.strip().lower() == "yes"
+        ]
 
         if not proxies:
             logging.warning("⚠️ No se encontraron proxies HTTPS.")
@@ -67,9 +65,7 @@ def get_free_proxies():
 proxies = get_free_proxies()
 
 def get_random_proxy():
-    if proxies:
-        return {"http": random.choice(proxies), "https": random.choice(proxies)}
-    return None
+    return {"http": random.choice(proxies), "https": random.choice(proxies)} if proxies else None
 
 # Configurar Selenium WebDriver
 def configure_selenium():
@@ -77,6 +73,8 @@ def configure_selenium():
     options.add_argument("--headless")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
 
     proxy = get_random_proxy()
     if proxy:
@@ -84,7 +82,10 @@ def configure_selenium():
 
     try:
         logging.info("🔄 Iniciando WebDriver para Selenium...")
-        return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        return driver
     except Exception as e:
         logging.error(f"❌ Error configurando Selenium: {e}")
         return None
@@ -101,23 +102,26 @@ def login_instagram():
     time.sleep(random.uniform(3, 7))
 
     try:
-        driver.find_element(By.NAME, "username").send_keys(INSTAGRAM_USER)
-        driver.find_element(By.NAME, "password").send_keys(INSTAGRAM_PASS)
-        driver.find_element(By.NAME, "password").send_keys(Keys.RETURN)
-        time.sleep(random.uniform(5, 10))
+        wait = WebDriverWait(driver, 15)
+        username_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='username']")))
+        password_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='password']")))
 
+        username_input.send_keys(INSTAGRAM_USER)
+        password_input.send_keys(INSTAGRAM_PASS)
+        password_input.send_keys(Keys.RETURN)
+
+        time.sleep(random.uniform(5, 10))
         if "challenge" in driver.current_url or "checkpoint" in driver.current_url:
             logging.warning("⚠️ Instagram requiere verificación manual.")
             driver.quit()
             return None
 
         logging.info("✅ Inicio de sesión exitoso en Instagram.")
+        return driver
     except Exception as e:
         logging.error(f"❌ Error al iniciar sesión: {e}")
         driver.quit()
         return None
-
-    return driver
 
 # Obtener publicaciones por hashtag
 def get_posts_by_hashtag(driver, hashtag):
@@ -125,8 +129,7 @@ def get_posts_by_hashtag(driver, hashtag):
         logging.info(f"🔍 Buscando publicaciones para #{hashtag}")
         driver.get(f"https://www.instagram.com/explore/tags/{hashtag}/")
         time.sleep(random.uniform(5, 10))
-        posts = driver.find_elements(By.CSS_SELECTOR, "article div div div div a")
-        return [post.get_attribute("href") for post in posts[:5]]
+        return [post.get_attribute("href") for post in driver.find_elements(By.CSS_SELECTOR, "article div div div div a")[:5]]
     except Exception as e:
         logging.error(f"❌ Error al obtener posts de #{hashtag}: {e}")
         return []
@@ -203,3 +206,4 @@ def automate_instagram():
 
 if __name__ == "__main__":
     automate_instagram.apply_async(countdown=3600)
+
