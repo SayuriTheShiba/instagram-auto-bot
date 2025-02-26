@@ -27,6 +27,7 @@ posts_collection = db["posts"]
 
 # Configurar Celery para tareas automáticas
 app = Celery("tasks", broker=REDIS_URL)
+app.conf.broker_connection_retry_on_startup = True  # Solución para Celery 6.0
 
 # Obtener proxies gratuitos
 def get_free_proxies():
@@ -37,11 +38,11 @@ def get_free_proxies():
     proxies = []
     for row in soup.select("table tbody tr"):
         columns = row.find_all("td")
-        if len(columns) >= 7:  # Validar que tiene suficientes columnas
+        if len(columns) >= 7:
             ip, port, https = columns[0].text.strip(), columns[1].text.strip(), columns[6].text.strip()
             if https.lower() == "yes":
                 proxies.append(f"http://{ip}:{port}")
-    
+
     return proxies
 
 # Fuente alternativa de proxies
@@ -156,14 +157,25 @@ def post_image(driver, image_path, caption):
 @app.task
 def automate_instagram():
     driver = login_instagram()
-    hashtags = ["sofubi", "arttoy", "designerart", "sofubipromoter", "softvinyl", "kaijuart", "collectibles"]
+    hashtags = [
+        "sofubi", "arttoy", "designerart", "sofubipromoter", "softvinyl", 
+        "sofubiforsale", "sofubilottery", "kaijuart", "handmadearttoy", 
+        "arttoycollector", "resinart", "japanesetoys", "vinylart", "urbanvinyl", 
+        "lowbrowart", "creativetoys", "hiddengemtoy", "collectibles"
+    ]  # Lista ampliada de hashtags
 
     seo_captions = [
-        "🔥 Descubre esta joya del #Sofubi 🎨 Perfecto para coleccionistas exigentes. 🚀\n#ArtToy #DesignerToys #KaijuArt",
-        "✨ Este #ArtToy es una obra maestra 🏆 Ideal para fans del #VinylArt 🎭\n🎨 Creado por @{author}. #HandmadeArtToy",
-        "💎 Para los verdaderos coleccionistas: una pieza de ensueño 🤩🔥\n🎨 Creado por @{author}. #RareToy",
-        "🚀 Edición limitada 🚨 No te quedes sin esta obra de arte 🖤\n🛒 ¿La agregarías a tu colección? #KaijuArt #ToyPhotography",
-    ]
+        "🔥 Descubre esta joya del #Sofubi 🎨 Perfecto para coleccionistas exigentes. ¿Qué te parece? 🚀\n#ArtToy #DesignerToys #KaijuArt",
+        "✨ Este #ArtToy es una obra maestra 🏆 Ideal para fans del #VinylArt y el #SoftVinyl 🎭\n🎨 Mención especial a @{author} por esta pieza increíble. #HandmadeArtToy",
+        "💎 Para los verdaderos coleccionistas: una pieza de ensueño 🤩🔥\n🎨 Creado por @{author}, un maestro del #Sofubi 👀 ¿Ya tienes el tuyo? #RareToy",
+        "🚀 Diseño exclusivo para amantes del #UrbanVinyl y el #ResinArt 💀\n🎨 Esta pieza de @{author} es un MUST HAVE para tu colección. #Collectibles",
+        "🔥 Edición limitada 🚨 No te quedes sin esta obra de arte en soft vinyl 🖤\n🛒 ¿La agregarías a tu colección? #KaijuArt #ToyPhotography",
+        "🎭 El arte en vinil cobra vida con esta impresionante creación 🎨\nCreado por @{author}, una leyenda del #ArtToy 👏🔥\n📢 #ToyCollector #JapaneseToys",
+        "🏆 Solo para coleccionistas serios 😎 Esta pieza de #Sofubi es una rareza absoluta 🛒\n🎨 Obra de @{author}, ¡apoya a los artistas! #VinylToys",
+        "🔮 Magia en soft vinyl ✨ Una creación única de @{author} que redefine el #DesignerToys\n🔥 #HandmadeArtToy #HiddenGemToy",
+        "🚀 Nuevo hallazgo en la escena del #Sofubi 🔥 ¿Quién más ama estos detalles? 👀\n🎨 By @{author}, una joya del #VinylArt",
+        "💀 El #LowbrowArt en su máxima expresión 🎭\n🎨 Obra maestra de @{author} para coleccionistas con ojo crítico 👁️🔥\n#CollectibleVinyl",
+    ]  # Lista de captions SEO aleatorios para mayor diversidad
 
     for hashtag in hashtags:
         posts = get_posts_by_hashtag(driver, hashtag)
@@ -177,5 +189,4 @@ def automate_instagram():
 
             time.sleep(random.uniform(1800, 3600))
 
-automate_instagram.apply_async(countdown=3600)
-
+automate_instagram.apply_async(countdown=3600)  # Ejecutar cada hora
