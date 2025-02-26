@@ -17,18 +17,17 @@ import os
 # Cargar variables de entorno
 INSTAGRAM_USER = os.getenv("INSTAGRAM_USER")
 INSTAGRAM_PASS = os.getenv("INSTAGRAM_PASS")
-MONGO_URI = os.getenv("MONGO_URL")
+MONGO_URI = os.getenv("MONGO_URL")   # Asumimos que en Railway la variable se llama MONGO_URL
 REDIS_URL = os.getenv("REDIS_URL")
 
 # Configurar base de datos
-client = MongoClient(MONGO_URL)
+client = MongoClient(MONGO_URI)      # Usar la misma variable MONGO_URI
 db = client["instagram_bot"]
 posts_collection = db["posts"]
 
 # Configurar Celery para tareas automáticas
 app = Celery("tasks", broker=REDIS_URL)
 
-# Obtener proxies gratuitos
 def get_free_proxies():
     url = "https://free-proxy-list.net/"
     response = requests.get(url)
@@ -48,7 +47,6 @@ def get_random_proxy():
     proxy = random.choice(proxies)
     return {"http": proxy, "https": proxy}
 
-# Configurar Selenium
 def configure_selenium():
     options = Options()
     options.add_argument("--headless")
@@ -62,7 +60,6 @@ def configure_selenium():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
 
-# Iniciar sesión en Instagram
 def login_instagram():
     driver = configure_selenium()
     driver.get("https://www.instagram.com/accounts/login/")
@@ -75,7 +72,6 @@ def login_instagram():
 
         time.sleep(random.uniform(5, 10))
 
-        # Verificar si Instagram pide verificación (checkpoint/challenge)
         current_url = driver.current_url
         if "challenge" in current_url or "checkpoint" in current_url:
             print("⚠️ Instagram está pidiendo verificación (challenge/checkpoint). Revisa la cuenta manualmente.")
@@ -89,17 +85,14 @@ def login_instagram():
 
     return driver
 
-# Obtener publicaciones por hashtag
 def get_posts_by_hashtag(driver, hashtag):
     driver.get(f"https://www.instagram.com/explore/tags/{hashtag}/")
     time.sleep(random.uniform(5, 10))
 
     posts = driver.find_elements(By.CSS_SELECTOR, "article div div div div a")
-    # Extrae solo 5 para evitar bloqueos o exceso de scraping
-    links = [post.get_attribute("href") for post in posts[:5]]
+    links = [post.get_attribute("href") for post in posts[:5]]  # Extrae 5 para evitar bloqueos
     return links
 
-# Descargar imagen y obtener autor
 def download_image(driver, post_url):
     driver.get(post_url)
     time.sleep(random.uniform(5, 10))
@@ -113,10 +106,8 @@ def download_image(driver, post_url):
 
     author_element = driver.find_element(By.CSS_SELECTOR, "header div div div span a")
     author = author_element.text
-
     return author
 
-# Publicar en Instagram
 def post_image(driver, image_path, caption):
     driver.get("https://www.instagram.com/")
     time.sleep(random.uniform(5, 10))
@@ -137,11 +128,9 @@ def post_image(driver, image_path, caption):
     driver.find_element(By.XPATH, "//button[text()='Share']").click()
     time.sleep(random.uniform(5, 10))
 
-# Automatización total
 @app.task
 def automate_instagram():
     driver = login_instagram()
-    # Si no logra iniciar sesión (driver == None), terminar la tarea
     if driver is None:
         print("⚠️ No se pudo iniciar sesión. Tarea terminada.")
         return
@@ -166,18 +155,16 @@ def automate_instagram():
         "💀 El #LowbrowArt en su máxima expresión 🎭\n🎨 Obra maestra de @{author} para coleccionistas con ojo crítico 👁️🔥\n#CollectibleVinyl",
     ]
 
-    # Iterar por cada hashtag
     for hashtag in hashtags:
         posts = get_posts_by_hashtag(driver, hashtag)
         for post in posts:
             author = download_image(driver, post)
-            # Reemplazar @{author} en un caption al azar
             final_caption = random.choice(seo_captions).replace("@{author}", f"@{author}")
             post_image(driver, "post.jpg", final_caption)
 
             # Esperar entre 30 y 60 minutos
             time.sleep(random.uniform(1800, 3600))
 
-# Ejecutar la tarea cada hora
 automate_instagram.apply_async(countdown=3600)
+
 
