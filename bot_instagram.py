@@ -17,7 +17,7 @@ import os
 # Cargar variables de entorno
 INSTAGRAM_USER = os.getenv("INSTAGRAM_USER")
 INSTAGRAM_PASS = os.getenv("INSTAGRAM_PASS")
-MONGO_URI = os.getenv("MONGO_URL")
+MONGO_URI = os.getenv("MONGO_URI")
 REDIS_URL = os.getenv("REDIS_URL")
 
 # Configurar base de datos
@@ -37,15 +37,35 @@ def get_free_proxies():
     proxies = []
     for row in soup.select("table tbody tr"):
         columns = row.find_all("td")
-        ip, port, https = columns[0].text, columns[1].text, columns[6].text.strip()
-        if https == "yes":
-            proxies.append(f"http://{ip}:{port}")
+        if len(columns) >= 7:  # Validar que tiene suficientes columnas
+            ip, port, https = columns[0].text.strip(), columns[1].text.strip(), columns[6].text.strip()
+            if https.lower() == "yes":
+                proxies.append(f"http://{ip}:{port}")
     
     return proxies
 
+# Fuente alternativa de proxies
+def get_backup_proxies():
+    url = "https://proxylist.geonode.com/api/proxy-list?limit=20&page=1&sort_by=lastChecked&sort_type=desc"
+    response = requests.get(url).json()
+
+    proxy_list = []
+    for proxy in response["data"]:
+        if proxy["protocols"][0] == "https":
+            proxy_list.append(f"http://{proxy['ip']}:{proxy['port']}")
+
+    return proxy_list
+
+# Obtener proxies seguros
 proxies = get_free_proxies()
+if not proxies:
+    print("⚠️ No se encontraron proxies en la primera fuente. Probando otra fuente...")
+    proxies = get_backup_proxies()
 
 def get_random_proxy():
+    if not proxies:
+        print("⚠️ No hay proxies disponibles, ejecutando sin proxy.")
+        return None
     proxy = random.choice(proxies)
     return {"http": proxy, "https": proxy}
 
@@ -56,8 +76,9 @@ def configure_selenium():
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 
-    proxy = get_random_proxy()["http"]
-    options.add_argument(f"--proxy-server={proxy}")
+    proxy = get_random_proxy()
+    if proxy:
+        options.add_argument(f"--proxy-server={proxy['http']}")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
@@ -68,11 +89,15 @@ def login_instagram():
     driver.get("https://www.instagram.com/accounts/login/")
     time.sleep(random.uniform(3, 7))
 
-    driver.find_element(By.NAME, "username").send_keys(INSTAGRAM_USER)
-    driver.find_element(By.NAME, "password").send_keys(INSTAGRAM_PASS)
-    driver.find_element(By.NAME, "password").send_keys(Keys.RETURN)
+    try:
+        driver.find_element(By.NAME, "username").send_keys(INSTAGRAM_USER)
+        driver.find_element(By.NAME, "password").send_keys(INSTAGRAM_PASS)
+        driver.find_element(By.NAME, "password").send_keys(Keys.RETURN)
+        time.sleep(random.uniform(5, 10))
+    except Exception as e:
+        print(f"❌ Error al iniciar sesión: {e}")
+        driver.quit()
 
-    time.sleep(random.uniform(5, 10))
     return driver
 
 # Obtener publicaciones por hashtag
@@ -81,7 +106,7 @@ def get_posts_by_hashtag(driver, hashtag):
     time.sleep(random.uniform(5, 10))
 
     posts = driver.find_elements(By.CSS_SELECTOR, "article div div div div a")
-    links = [post.get_attribute("href") for post in posts[:5]]  # Extrae solo 5 para evitar bloqueos
+    links = [post.get_attribute("href") for post in posts[:5]]
     return links
 
 # Descargar imagen y obtener autor
@@ -89,70 +114,68 @@ def download_image(driver, post_url):
     driver.get(post_url)
     time.sleep(random.uniform(5, 10))
 
-    image_element = driver.find_element(By.CSS_SELECTOR, "article img")
-    image_url = image_element.get_attribute("src")
+    try:
+        image_element = driver.find_element(By.CSS_SELECTOR, "article img")
+        image_url = image_element.get_attribute("src")
+        response = requests.get(image_url)
+        img = Image.open(BytesIO(response.content))
+        img.save("post.jpg")
 
-    response = requests.get(image_url)
-    img = Image.open(BytesIO(response.content))
-    img.save("post.jpg")
-
-    author_element = driver.find_element(By.CSS_SELECTOR, "header div div div span a")
-    author = author_element.text
-
-    return author
+        author_element = driver.find_element(By.CSS_SELECTOR, "header div div div span a")
+        author = author_element.text
+        return author
+    except Exception as e:
+        print(f"❌ Error descargando imagen: {e}")
+        return None
 
 # Publicar en Instagram
 def post_image(driver, image_path, caption):
     driver.get("https://www.instagram.com/")
     time.sleep(random.uniform(5, 10))
 
-    driver.find_element(By.XPATH, "//div[text()='Create']").click()
-    time.sleep(random.uniform(3, 7))
+    try:
+        driver.find_element(By.XPATH, "//div[text()='Create']").click()
+        time.sleep(random.uniform(3, 7))
 
-    file_input = driver.find_element(By.XPATH, "//input[@type='file']")
-    file_input.send_keys(image_path)
-    time.sleep(random.uniform(3, 7))
+        file_input = driver.find_element(By.XPATH, "//input[@type='file']")
+        file_input.send_keys(image_path)
+        time.sleep(random.uniform(3, 7))
 
-    driver.find_element(By.XPATH, "//button[text()='Next']").click()
-    time.sleep(random.uniform(3, 7))
+        driver.find_element(By.XPATH, "//button[text()='Next']").click()
+        time.sleep(random.uniform(3, 7))
 
-    caption_box = driver.find_element(By.XPATH, "//textarea")
-    caption_box.send_keys(caption)
+        caption_box = driver.find_element(By.XPATH, "//textarea")
+        caption_box.send_keys(caption)
 
-    driver.find_element(By.XPATH, "//button[text()='Share']").click()
-    time.sleep(random.uniform(5, 10))
+        driver.find_element(By.XPATH, "//button[text()='Share']").click()
+        time.sleep(random.uniform(5, 10))
+    except Exception as e:
+        print(f"❌ Error publicando en Instagram: {e}")
 
 # Automatización total
 @app.task
 def automate_instagram():
     driver = login_instagram()
-    hashtags = [
-        "sofubi", "arttoy", "designerart", "sofubipromoter", "softvinyl", 
-        "sofubiforsale", "sofubilottery", "kaijuart", "handmadearttoy", 
-        "arttoycollector", "resinart", "japanesetoys", "vinylart", "urbanvinyl", 
-        "lowbrowart", "creativetoys", "hiddengemtoy", "collectibles"
-    ]  # Lista ampliada de hashtags
+    hashtags = ["sofubi", "arttoy", "designerart", "sofubipromoter", "softvinyl", "kaijuart", "collectibles"]
 
     seo_captions = [
-        "🔥 Descubre esta joya del #Sofubi 🎨 Perfecto para coleccionistas exigentes. ¿Qué te parece? 🚀\n#ArtToy #DesignerToys #KaijuArt",
-        "✨ Este #ArtToy es una obra maestra 🏆 Ideal para fans del #VinylArt y el #SoftVinyl 🎭\n🎨 Mención especial a @{author} por esta pieza increíble. #HandmadeArtToy",
-        "💎 Para los verdaderos coleccionistas: una pieza de ensueño 🤩🔥\n🎨 Creado por @{author}, un maestro del #Sofubi 👀 ¿Ya tienes el tuyo? #RareToy",
-        "🚀 Diseño exclusivo para amantes del #UrbanVinyl y el #ResinArt 💀\n🎨 Esta pieza de @{author} es un MUST HAVE para tu colección. #Collectibles",
-        "🔥 Edición limitada 🚨 No te quedes sin esta obra de arte en soft vinyl 🖤\n🛒 ¿La agregarías a tu colección? #KaijuArt #ToyPhotography",
-        "🎭 El arte en vinil cobra vida con esta impresionante creación 🎨\nCreado por @{author}, una leyenda del #ArtToy 👏🔥\n📢 #ToyCollector #JapaneseToys",
-        "🏆 Solo para coleccionistas serios 😎 Esta pieza de #Sofubi es una rareza absoluta 🛒\n🎨 Obra de @{author}, ¡apoya a los artistas! #VinylToys",
-        "🔮 Magia en soft vinyl ✨ Una creación única de @{author} que redefine el #DesignerToys\n🔥 #HandmadeArtToy #HiddenGemToy",
-        "🚀 Nuevo hallazgo en la escena del #Sofubi 🔥 ¿Quién más ama estos detalles? 👀\n🎨 By @{author}, una joya del #VinylArt",
-        "💀 El #LowbrowArt en su máxima expresión 🎭\n🎨 Obra maestra de @{author} para coleccionistas con ojo crítico 👁️🔥\n#CollectibleVinyl",
-    ]  # Lista de captions SEO aleatorios para mayor diversidad
+        "🔥 Descubre esta joya del #Sofubi 🎨 Perfecto para coleccionistas exigentes. 🚀\n#ArtToy #DesignerToys #KaijuArt",
+        "✨ Este #ArtToy es una obra maestra 🏆 Ideal para fans del #VinylArt 🎭\n🎨 Creado por @{author}. #HandmadeArtToy",
+        "💎 Para los verdaderos coleccionistas: una pieza de ensueño 🤩🔥\n🎨 Creado por @{author}. #RareToy",
+        "🚀 Edición limitada 🚨 No te quedes sin esta obra de arte 🖤\n🛒 ¿La agregarías a tu colección? #KaijuArt #ToyPhotography",
+    ]
 
     for hashtag in hashtags:
         posts = get_posts_by_hashtag(driver, hashtag)
         for post in posts:
             author = download_image(driver, post)
-            seo_caption = random.choice(seo_captions).replace("@{author}", f"@{author}")  # Selecciona un caption al azar
-            post_image(driver, "post.jpg", seo_caption)
-            time.sleep(random.uniform(1800, 3600))  # Pausa entre 30 min y 1 hora para simular comportamiento humano
+            if not author:
+                continue  # Evita errores si no pudo descargar la imagen
 
-automate_instagram.apply_async(countdown=3600)  # Ejecutar cada hora
+            seo_caption = random.choice(seo_captions).replace("@{author}", f"@{author}")
+            post_image(driver, "post.jpg", seo_caption)
+
+            time.sleep(random.uniform(1800, 3600))
+
+automate_instagram.apply_async(countdown=3600)
 
