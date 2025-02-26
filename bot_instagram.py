@@ -3,6 +3,7 @@ import random
 import requests
 import logging
 import sys
+import os
 from io import BytesIO
 from PIL import Image
 from selenium import webdriver
@@ -16,7 +17,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 from pymongo import MongoClient
 from bs4 import BeautifulSoup
 from celery import Celery
-import os
 
 # 🔹 Configurar logging para Railway
 logging.basicConfig(
@@ -72,6 +72,12 @@ def configure_selenium():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--remote-debugging-port=9222")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
@@ -103,8 +109,8 @@ def login_instagram():
 
     try:
         wait = WebDriverWait(driver, 15)
-        username_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='username']")))
-        password_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='password']")))
+        username_input = wait.until(EC.presence_of_element_located((By.NAME, "username")))
+        password_input = wait.until(EC.presence_of_element_located((By.NAME, "password")))
 
         username_input.send_keys(INSTAGRAM_USER)
         password_input.send_keys(INSTAGRAM_PASS)
@@ -206,4 +212,3 @@ def automate_instagram():
 
 if __name__ == "__main__":
     automate_instagram.apply_async(countdown=3600)
-
