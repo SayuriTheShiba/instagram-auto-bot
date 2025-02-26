@@ -1,3 +1,4 @@
+# Usar imagen base de Python 3.12 slim
 FROM python:3.12-slim
 
 # Establecer directorio de trabajo
@@ -22,18 +23,17 @@ RUN apt-get update && apt-get install -y \
 
 # Agregar la clave y repositorio de Google Chrome
 RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | tee /etc/apt/keyrings/google-chrome.asc > /dev/null && \
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | tee /etc/apt/keyrings/google-chrome.asc > /dev/null && \
     echo "deb [signed-by=/etc/apt/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" | tee /etc/apt/sources.list.d/google-chrome.list
 
 # Instalar Google Chrome estable desde el repositorio oficial
 RUN apt-get update && apt-get install -y google-chrome-stable --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Definir la versión específica de ChromeDriver compatible con Google Chrome
-ENV CHROMEDRIVER_VERSION=114.0.5735.90
-
-# Descargar e instalar ChromeDriver
-RUN wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" && \
+# Obtener la versión instalada de Chrome y la versión compatible de ChromeDriver
+RUN CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+') && \
+    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION") && \
+    wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" && \
     unzip chromedriver_linux64.zip -d /usr/local/bin/ && \
     rm chromedriver_linux64.zip && \
     chmod +x /usr/local/bin/chromedriver
@@ -42,7 +42,7 @@ RUN wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/c
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Crear un usuario sin privilegios
+# Crear un usuario sin privilegios para seguridad
 RUN adduser --disabled-password --gecos '' myuser
 
 # Cambiar al nuevo usuario
@@ -51,8 +51,9 @@ USER myuser
 # Copiar el resto de la aplicación
 COPY . .
 
-# Ejecutar Celery
+# Ejecutar Celery con configuración optimizada
 CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info", "--concurrency=2", "--pool=solo"]
+
 
 
 
