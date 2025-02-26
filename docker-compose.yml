@@ -1,11 +1,18 @@
+version: "3.8"
+
 services:
   bot:
     build: .
     restart: always
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy  # Esperar a que Redis esté listo antes de iniciar Celery
     environment:
       INSTAGRAM_USER: "${INSTAGRAM_USER}"
       INSTAGRAM_PASS: "${INSTAGRAM_PASS}"
-      MONGO_URI: "${MONGO_URL}"
+      MONGO_URI: "${MONGO_URI}"
       REDIS_URL: "${REDIS_URL}"
+    command: sh -c "while true; do celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo; sleep 5; done"
+
+  redis:
+    imag
