@@ -4,7 +4,7 @@ FROM python:3.12-slim
 # Establecer el directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias para Chrome, Selenium y compilación de paquetes de Python
+# Instalar dependencias del sistema necesarias para Chrome, Selenium, Pillow y compilación de paquetes Python
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
@@ -22,6 +22,10 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     libssl-dev \
     python3-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    libfreetype6-dev \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
@@ -79,7 +83,6 @@ ENV DISPLAY=:99
 
 # Ejecutar Celery y evitar que el contenedor se cierre en Railway
 CMD ["sh", "-c", "celery -A bot_instagram worker --loglevel=info --concurrency=2 --pool=solo --without-heartbeat & while true; do sleep 30; done"]
-
 
 
 
