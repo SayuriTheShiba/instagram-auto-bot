@@ -7,3 +7,4 @@ pymongo
 celery
 redis
 python-dotenv
+supervisor
