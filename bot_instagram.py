@@ -27,7 +27,10 @@ posts_collection = db["posts"]
 
 # Configurar Celery
 app = Celery("bot_instagram", broker=REDIS_URL)
-app.conf.broker_connection_retry_on_startup = True  # Evita desconexiones
+app.conf.broker_connection_retry_on_startup = True
+app.conf.task_acks_late = True  # Evita perder tareas si el worker muere
+app.conf.task_acks_on_failure_or_timeout = False  # No marca la tarea como ACK si falla
+app.conf.worker_prefetch_multiplier = 1  # Asegura que Celery solo ejecute una tarea a la vez
 
 # Obtener proxies gratuitos
 def get_free_proxies():
@@ -187,3 +190,4 @@ def automate_instagram():
 # Asegurar que la tarea solo se ejecute una vez por hora
 if __name__ == "__main__":
     automate_instagram.apply_async(countdown=3600)
+
