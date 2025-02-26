@@ -79,10 +79,11 @@ COPY . .
 RUN adduser --disabled-password --gecos '' myuser
 USER myuser
 
-# Variables de entorno (si usas Chrome o Celery que las requiera)
+# Variables de entorno (definir PORT para que el servidor HTTP lo use)
 ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_BIN=/usr/local/bin/chromedriver
 ENV DISPLAY=:99
+ENV PORT=8080
 
 # Inicia Supervisor con la configuración (Celery + Servidor HTTP dummy)
 CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
