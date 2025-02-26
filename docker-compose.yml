@@ -10,7 +10,7 @@ services:
       INSTAGRAM_USER: "${INSTAGRAM_USER}"
       INSTAGRAM_PASS: "${INSTAGRAM_PASS}"
       MONGO_URI: "${MONGO_URI}"
-      REDIS_URL: "redis://default:mxJuHzwaYKiFEwIAzRfcjghRDurcethK@redis.railway.internal:6379"
+      REDIS_URL: "redis://default:ltFAcydADlvycKkCMxqYypbeEEyQNZjN@redis.railway.internal:6379"
 
   redis:
     image: "redis:alpine"
