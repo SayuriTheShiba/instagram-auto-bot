@@ -9,25 +9,25 @@ RUN apt-get update && apt-get install -y \
     unzip \
     curl \
     gnupg \
-    libnss3 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxrandr2 \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
     libgbm1 \
     libgtk-3-0 \
-    libasound2 \
     libnspr4 \
+    libnss3 \
     xdg-utils \
-    lsb-release \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Descargar e instalar Google Chrome estable
-RUN wget -q -O google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
-    apt-get install -y ./google-chrome.deb && \
-    rm google-chrome.deb
+# Agregar la clave y repositorio de Google Chrome
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | tee /etc/apt/keyrings/google-chrome.asc > /dev/null && \
+    echo "deb [signed-by=/etc/apt/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" | tee /etc/apt/sources.list.d/google-chrome.list
+
+# Instalar Google Chrome estable desde el repositorio oficial
+RUN apt-get update && apt-get install -y google-chrome-stable --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
 # Definir la versión específica de ChromeDriver compatible con Google Chrome
 ENV CHROMEDRIVER_VERSION=114.0.5735.90
@@ -53,9 +53,6 @@ COPY . .
 
 # Ejecutar Celery
 CMD ["celery", "-A", "bot_instagram", "worker", "--loglevel=info", "--concurrency=2", "--pool=solo"]
-
-
-
 
 
 
