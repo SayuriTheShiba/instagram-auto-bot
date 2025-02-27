@@ -60,13 +60,13 @@ def keep_alive():
 def get_free_proxies():
     try:
         url = "https://free-proxy-list.net/"
-        print("Obteniendo proxies desde free-proxy-list.net")
+        print("Obteniendo proxies desde free-proxy-list.net...")
         response = requests.get(url, timeout=10)
-        print("Respuesta recibida para proxies")
+        print("Respuesta recibida para proxies.")
         soup = BeautifulSoup(response.text, "html.parser")
         proxies = [
             f"http://{row.find_all('td')[0].text.strip()}:{row.find_all('td')[1].text.strip()}"
-            for row in soup.select("table tbody tr") 
+            for row in soup.select("table tbody tr")
             if len(row.find_all("td")) >= 7 and row.find_all("td")[6].text.strip().lower() == "yes"
         ]
         if not proxies:
@@ -246,6 +246,8 @@ def automate_instagram():
 
 if __name__ == "__main__":
     print("Iniciando tareas de Celery desde el main")
-    keep_alive.apply_async(countdown=300)  # Cada 5 minutos
-    automate_instagram.apply_async(countdown=3600)  # Cada hora
+    # Para pruebas inmediatas, cambia los countdown a 0
+    keep_alive.apply_async(countdown=0)  # Ejecuta inmediatamente
+    automate_instagram.apply_async(countdown=0)  # Ejecuta inmediatamente
+
 
